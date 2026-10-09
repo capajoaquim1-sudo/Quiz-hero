@@ -1,0 +1,583 @@
+<title>Dino et le Chat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap">
+<style>
+/* Layout: full-screen canvas, cat photo fixed behind, neon platforms scroll; glass HUD panels with chamfered corners */
+:root{
+  --void:#05080f;
+  --glass:rgba(8,16,28,.72);
+  --edge:rgba(62,242,255,.45);
+  --cyan:#3ef2ff;
+  --eye:#7dff9e;
+  --eye-deep:#1f9e57;
+  --pulse:#ff3ea5;
+  --ink:#e8fbff;
+  --muted:#8fb3bf;
+  --bad:#ff5d7a;
+  --display:"Orbitron", ui-monospace, "Courier New", monospace;
+  --body:"Rajdhani", system-ui, sans-serif;
+  --cut:14px;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--void);color:var(--ink);font-family:var(--body);overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:manipulation}
+#wrap{position:relative;height:100%;width:100%}
+canvas{display:block;width:100%;height:100%}
+.scan{position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(62,242,255,.035) 0 1px,transparent 1px 3px);mix-blend-mode:screen}
+.vignette{position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 120px rgba(0,0,0,.65)}
+.hud{position:absolute;inset:0 0 auto 0;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:12px 16px;pointer-events:none}
+.plate{background:var(--glass);border:1px solid var(--edge);padding:8px 12px;clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,10px 100%,0 calc(100% - 10px));backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.label{font-family:var(--display);font-size:9px;letter-spacing:.24em;color:var(--muted);text-transform:uppercase}
+.hearts{display:flex;gap:6px;margin-top:4px}
+.cell{width:22px;height:10px;border:1px solid var(--eye);transform:skewX(-20deg)}
+.cell.on{background:var(--eye);box-shadow:0 0 10px var(--eye)}
+.scores{text-align:right;font-variant-numeric:tabular-nums}
+.scores .now{font-family:var(--display);font-size:24px;font-weight:900;color:var(--cyan);text-shadow:0 0 12px rgba(62,242,255,.7);letter-spacing:.06em}
+.scores .hi{font-family:var(--display);font-size:10px;color:var(--muted);letter-spacing:.18em}
+.hud-btns{position:absolute;right:16px;bottom:calc(14px + env(safe-area-inset-bottom,0px));display:flex;gap:8px}
+.chip{font-family:var(--display);font-size:11px;letter-spacing:.18em;text-transform:uppercase;background:var(--glass);color:var(--cyan);border:1px solid var(--edge);padding:10px 14px;cursor:pointer;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
+.chip:focus-visible,.btn:focus-visible,.opt:focus-visible{outline:2px solid var(--eye);outline-offset:2px}
+.overlay{position:absolute;inset:0;display:grid;place-items:center;padding:16px;background:radial-gradient(ellipse at center,rgba(5,8,15,.2),rgba(5,8,15,.6))}
+.card{position:relative;width:min(460px,100%);max-height:calc(100% - 8px);overflow:auto;background:var(--glass);border:1px solid var(--edge);padding:22px 20px;display:flex;flex-direction:column;gap:14px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);clip-path:polygon(var(--cut) 0,100% 0,100% calc(100% - var(--cut)),calc(100% - var(--cut)) 100%,0 100%,0 var(--cut));box-shadow:inset 0 0 40px rgba(62,242,255,.08)}
+.card::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);animation:sweep 3s linear infinite}
+@keyframes sweep{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+.card h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(26px,7vw,40px);line-height:1.05;letter-spacing:.04em;text-transform:uppercase;text-wrap:balance;color:var(--ink);text-shadow:0 0 18px rgba(62,242,255,.45)}
+.card h1 span{color:var(--eye);text-shadow:0 0 18px rgba(125,255,158,.7)}
+.card h2{margin:0;font-family:var(--body);font-weight:700;font-size:26px;line-height:1.15;text-wrap:balance}
+.card p{margin:0;color:var(--muted);line-height:1.4;font-size:17px;font-weight:500}
+.kbd{font-family:var(--display);font-size:12px;color:var(--cyan);border:1px solid var(--edge);padding:1px 6px}
+.row{display:flex;flex-wrap:wrap;gap:10px}
+.btn{flex:1 1 150px;font-family:var(--display);font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;padding:14px;border:1px solid var(--edge);background:rgba(62,242,255,.06);color:var(--cyan);cursor:pointer;clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);transition:background .15s}
+.btn:hover{background:rgba(62,242,255,.16)}
+.btn.main{background:var(--eye);color:#03140a;border-color:var(--eye);box-shadow:0 0 22px rgba(125,255,158,.45)}
+.btn:active,.opt:active{transform:translateY(1px)}
+.eyebrow{font-family:var(--display);font-size:10px;letter-spacing:.28em;text-transform:uppercase;color:var(--pulse)}
+.photo{position:relative;border:1px solid var(--edge);aspect-ratio:16/10;max-width:100%;overflow:hidden;background:#000}
+.photo img{width:100%;height:100%;object-fit:cover;display:block}
+.photo::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(62,242,255,.06) 0 1px,transparent 1px 3px)}
+.photo .tag{position:absolute;left:8px;top:6px;z-index:1;font-family:var(--display);font-size:9px;letter-spacing:.2em;color:var(--cyan)}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.opt{font-family:var(--body);font-weight:700;font-size:18px;padding:12px 10px;border:1px solid var(--edge);background:rgba(62,242,255,.05);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
+.opt .sw{width:16px;height:16px;border-radius:50%;border:1px solid rgba(255,255,255,.5);flex:none}
+.opt.ok{background:var(--eye-deep);border-color:var(--eye);box-shadow:0 0 16px rgba(125,255,158,.5)}
+.opt.no{background:rgba(255,93,122,.25);border-color:var(--bad)}
+.feedback{min-height:24px;font-family:var(--display);font-size:13px;letter-spacing:.08em}
+.feedback.ok{color:var(--eye)}.feedback.no{color:var(--bad)}
+.note{font-size:15px;color:var(--muted)}
+.big{font-family:var(--display);font-weight:900;font-size:48px;font-variant-numeric:tabular-nums;color:var(--cyan);text-shadow:0 0 20px rgba(62,242,255,.6);line-height:1}
+@media (max-width:420px){.opts{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div id="wrap">
+  <canvas id="cv" aria-label="Zone de jeu"></canvas>
+  <div class="scan"></div><div class="vignette"></div>
+  <div class="hud">
+    <div class="plate"><div class="label">Énergie</div><div class="hearts" id="hearts"></div></div>
+    <div class="plate scores"><div class="label">Score</div><div class="now" id="score">00000</div><div class="hi" id="hi">RECORD 00000</div></div>
+  </div>
+  <div class="hud-btns">
+    <button class="chip" id="pauseBtn" type="button">Pause</button>
+  </div>
+
+  <!-- Menu -->
+  <div class="overlay" id="menu">
+    <div class="card">
+      <div class="eyebrow">Run néon · secteur chat</div>
+      <h1>Dino et le <span>Chat</span></h1>
+      <p>Le chat reste en fond, les plateformes défilent. Saute avec <span class="kbd">Espace</span>, <span class="kbd">↑</span> ou en touchant l'écran. Double saut autorisé. Tous les 400 points, une question sur la photo du chat.</p>
+      <div class="row">
+        <button class="btn main" id="playBtn" type="button">Jouer</button>
+        <button class="btn" id="quizBtn" type="button">Mini-jeu du chat</button>
+      </div>
+      <div class="row">
+        <button class="btn" id="imgBtn" type="button">Choisir la photo du chat</button>
+      </div>
+      <p class="note" id="imgNote"></p>
+      <input type="file" id="file" accept="image/*" hidden>
+    </div>
+  </div>
+
+  <!-- Quiz -->
+  <div class="overlay" id="quiz" hidden>
+    <div class="card">
+      <div class="eyebrow" id="qEyebrow">Question bonus</div>
+      <div class="photo"><span class="tag">SCAN · SUJET FÉLIN</span><img id="qImg" alt="Photo du chat"></div>
+      <h2 id="qText"></h2>
+      <div class="opts" id="qOpts"></div>
+      <div class="feedback" id="qFeed"></div>
+      <div class="row"><button class="btn main" id="qNext" type="button" hidden>Continuer</button></div>
+    </div>
+  </div>
+
+  <!-- Game over / result -->
+  <div class="overlay" id="over" hidden>
+    <div class="card">
+      <div class="eyebrow" id="oEyebrow">Partie terminée</div>
+      <div class="big" id="oScore">0</div>
+      <p id="oText"></p>
+      <div class="row">
+        <button class="btn main" id="againBtn" type="button">Rejouer</button>
+        <button class="btn" id="menuBtn" type="button">Menu</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const $ = id => document.getElementById(id);
+
+/* ---------- Storage (safe) ---------- */
+const store = {
+  get(k){ try { return localStorage.getItem(k); } catch(e){ return null; } },
+  set(k,v){ try { localStorage.setItem(k,v); return true; } catch(e){ return false; } }
+};
+
+/* ---------- Background image ---------- */
+let bg = null;
+function drawnCat(){
+  const c = document.createElement('canvas'); c.width = 900; c.height = 700;
+  const g = c.getContext('2d');
+  const sky = g.createLinearGradient(0,0,0,700);
+  sky.addColorStop(0,'#1c2a33'); sky.addColorStop(1,'#0c1116');
+  g.fillStyle = sky; g.fillRect(0,0,900,700);
+  const cx = 450, cy = 330;
+  // ears
+  g.fillStyle = '#5d6168';
+  g.beginPath(); g.moveTo(cx-190,cy-60); g.lineTo(cx-150,cy-260); g.lineTo(cx-40,cy-150); g.fill();
+  g.beginPath(); g.moveTo(cx+190,cy-60); g.lineTo(cx+150,cy-260); g.lineTo(cx+40,cy-150); g.fill();
+  g.fillStyle = '#2a2c30';
+  g.beginPath(); g.moveTo(cx-165,cy-90); g.lineTo(cx-145,cy-215); g.lineTo(cx-80,cy-150); g.fill();
+  g.beginPath(); g.moveTo(cx+165,cy-90); g.lineTo(cx+145,cy-215); g.lineTo(cx+80,cy-150); g.fill();
+  // head
+  g.fillStyle = '#7a7e86';
+  g.beginPath(); g.ellipse(cx,cy,230,195,0,0,Math.PI*2); g.fill();
+  // black stripes
+  g.fillStyle = '#1b1c1f';
+  [[-40,-185,28,70],[0,-195,22,80],[40,-185,28,70]].forEach(([x,y,w,h])=>{g.beginPath();g.ellipse(cx+x,cy+y+h/2,w/2,h/2,0,0,Math.PI*2);g.fill();});
+  [[-1,1],[1,1]].forEach(([s])=>{ for(let i=0;i<3;i++){ g.beginPath(); g.ellipse(cx+s*(200-i*6),cy-20+i*40,40,10,s*0.2,0,Math.PI*2); g.fill(); } });
+  // muzzle
+  g.fillStyle = '#b9bcc2';
+  g.beginPath(); g.ellipse(cx-45,cy+85,60,45,0,0,Math.PI*2); g.ellipse(cx+45,cy+85,60,45,0,0,Math.PI*2); g.fill();
+  g.fillStyle = '#2a2c30';
+  g.beginPath(); g.moveTo(cx-18,cy+45); g.lineTo(cx+18,cy+45); g.lineTo(cx,cy+68); g.fill();
+  // eyes
+  [-1,1].forEach(s=>{
+    const ex = cx + s*85, ey = cy-10;
+    g.fillStyle = '#111'; g.beginPath(); g.ellipse(ex,ey,52,40,0,0,Math.PI*2); g.fill();
+    const ir = g.createRadialGradient(ex,ey,4,ex,ey,44);
+    ir.addColorStop(0,'#c8ff7a'); ir.addColorStop(.6,'#3fd46f'); ir.addColorStop(1,'#1d7a3e');
+    g.fillStyle = ir; g.beginPath(); g.ellipse(ex,ey,45,34,0,0,Math.PI*2); g.fill();
+    g.fillStyle = '#050505'; g.beginPath(); g.ellipse(ex,ey,8,30,0,0,Math.PI*2); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.85)'; g.beginPath(); g.arc(ex-14,ey-12,7,0,Math.PI*2); g.fill();
+  });
+  // whiskers
+  g.strokeStyle = 'rgba(230,230,230,.7)'; g.lineWidth = 3;
+  [-1,1].forEach(s=>{ for(let i=0;i<3;i++){ g.beginPath(); g.moveTo(cx+s*90,cy+90+i*14); g.lineTo(cx+s*(250),cy+70+i*30); g.stroke(); } });
+  const img = new Image(); img.src = c.toDataURL('image/png'); return img;
+}
+function setBg(src, fromUser){
+  const img = new Image();
+  img.onload = () => { bg = img; updateNote(fromUser); };
+  img.src = src;
+}
+function updateNote(user){
+  $('imgNote').textContent = user
+    ? 'Ta photo est en fond. Elle reste enregistrée sur cet appareil.'
+    : 'Pour l\'instant, un chat dessiné sert de fond. Ajoute ta photo pour la voir derrière le jeu.';
+}
+// Photo du chat (lien ibb.co). Une photo choisie sur l'appareil passe en priorité.
+const CAT_URL = 'https://i.ibb.co/vxCMvXTR/IMG-20260120-WA0002.jpg';
+const saved = store.get('dinochat_bg');
+if (saved) setBg(saved, true);
+else {
+  bg = drawnCat(); updateNote(false);
+  const web = new Image();
+  web.onload = () => { if (!store.get('dinochat_bg')) { bg = web; $('imgNote').textContent = 'La photo du chat est en fond. Tu peux en choisir une autre.'; } };
+  web.src = CAT_URL;
+}
+
+$('imgBtn').onclick = () => $('file').click();
+$('file').onchange = e => {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    const tmp = new Image();
+    tmp.onload = () => {
+      const max = 1400, k = Math.min(1, max / Math.max(tmp.width, tmp.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(tmp.width*k); c.height = Math.round(tmp.height*k);
+      c.getContext('2d').drawImage(tmp,0,0,c.width,c.height);
+      const url = c.toDataURL('image/jpeg', .82);
+      store.set('dinochat_bg', url);
+      setBg(url, true);
+    };
+    tmp.src = r.result;
+  };
+  r.readAsDataURL(f);
+};
+
+/* ---------- Sizing ---------- */
+const H = 400;           // logical world height
+let dpr = 1, cssW = 0, cssH = 0, S = 1, OY = 0, VW = 600;
+function resize(){
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cssW = cv.clientWidth; cssH = cv.clientHeight;
+  cv.width = Math.round(cssW*dpr); cv.height = Math.round(cssH*dpr);
+  S = cssH / H;
+  if (cssW / S < 620) S = cssW / 620;       // narrow screens: keep enough look-ahead
+  VW = cssW / S;
+  OY = Math.max(0, cssH - H*S) * 0.8;
+}
+window.addEventListener('resize', resize); resize();
+
+/* ---------- Physics ---------- */
+const G = 2400, J = 820, JMAX = J*J/(2*G);
+const PX = 120, PW = 40, PH = 44;
+
+/* ---------- Game state ---------- */
+let st;            // world state
+let mode = 'menu'; // menu | play | quiz | over
+let best = parseInt(store.get('dinochat_best') || '0', 10) || 0;
+$('hi').textContent = 'RECORD ' + pad(best);
+
+function pad(n){ return String(Math.floor(n)).padStart(5,'0'); }
+const rand = (a,b) => a + Math.random()*(b-a);
+
+function newGame(){
+  st = {
+    t:0, wx:0, v:300, y:300-PH, vy:0, grounded:true, jumps:0,
+    lives:3, inv:0, bonus:0, nextQuiz:400, frame:0, ft:0,
+    plats:[{x:-200, w:1300, y:300, obs:[], fish:[]}],
+    parts:[]
+  };
+  while (lastEnd() < VW + 800) genPlat();
+}
+function lastEnd(){ const p = st.plats[st.plats.length-1]; return p.x + p.w; }
+function reach(dy, v){
+  // time to come back down to a surface dy higher (dy>0) or lower (dy<0) than takeoff
+  const disc = J*J - 2*G*dy;
+  const t = (J + Math.sqrt(Math.max(0,disc))) / G;
+  return v * t;
+}
+function genPlat(){
+  const prev = st.plats[st.plats.length-1];
+  const v = st.v + 40; // assume a bit faster by the time we arrive
+  let y = prev.y + rand(-0.55*JMAX, 70);
+  y = Math.max(220, Math.min(345, y));
+  const dy = prev.y - y;                     // >0 means the next platform is higher
+  const maxGap = Math.max(70, reach(dy, v)*0.62 - PW);
+  const minGap = Math.min(maxGap, 60 + st.t*1.5);
+  const gap = rand(minGap, maxGap);
+  const w = rand(240, 560);
+  const p = {x: prev.x + prev.w + gap, w, y, obs:[], fish:[]};
+  // cactus: safe landing zone at start, safe take-off zone at end
+  if (w >= 400 && Math.random() < Math.min(.9, .45 + st.t*0.01)) {
+    const n = w > 500 && Math.random() < .5 ? 2 : 1;
+    const lo = 150, hi = w - 210;
+    const xs = n === 2 ? [rand(lo, lo+40), rand(hi-40, hi)] : [rand(lo, hi)];
+    xs.forEach(x => p.obs.push({x, w: rand(18,26), h: rand(30,48)}));
+  }
+  // fish snacks
+  const nf = Math.floor(rand(0,4));
+  for (let i=0;i<nf;i++) p.fish.push({x: 60 + (w-120)*(i+0.5)/Math.max(1,nf), y: -rand(60,115), got:false});
+  st.plats.push(p);
+}
+
+/* ---------- Input ---------- */
+let held = false;
+function press(){
+  if (mode !== 'play') return;
+  held = true;
+  if (st.grounded){ st.vy = -J; st.grounded = false; st.jumps = 1; }
+  else if (st.jumps < 2){ st.vy = -J*0.82; st.jumps = 2; puff(PX+PW/2, st.y+PH, 6); }
+}
+function release(){ held = false; if (st && st.vy < -320) st.vy = -320; }
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW'){
+    if (mode === 'play'){ e.preventDefault(); if (!e.repeat) press(); }
+  }
+  if (e.code === 'KeyP' || e.code === 'Escape') togglePause();
+});
+window.addEventListener('keyup', e => { if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') release(); });
+cv.addEventListener('pointerdown', e => { e.preventDefault(); press(); });
+window.addEventListener('pointerup', release);
+
+/* ---------- Particles ---------- */
+function puff(x,y,n,col){ for(let i=0;i<n;i++) st.parts.push({x:x+st.wx, y, vx:rand(-90,90), vy:rand(-160,-20), life:rand(.3,.6), col:col||'rgba(220,230,225,.8)'}); }
+
+/* ---------- Update ---------- */
+function hurt(){
+  if (st.inv > 0) return;
+  st.lives--; renderHearts();
+  puff(PX+PW/2, st.y+PH/2, 16, 'rgba(255,122,107,.9)');
+  if (st.lives <= 0){ gameOver(); return; }
+  respawn();
+}
+function respawn(){
+  const px = st.wx + PX;
+  const p = st.plats.find(q => q.x + q.w > px + 120) || st.plats[st.plats.length-1];
+  if (p.x + 20 > px) st.wx = p.x + 20 - PX;
+  st.y = p.y - PH - 40; st.vy = 0; st.jumps = 1; st.grounded = false;
+  st.inv = 1.6;
+  p.obs = p.obs.filter(o => p.x + o.x > st.wx + PX + 260);
+}
+function score(){ return st.wx/10 + st.bonus; }
+
+function update(dt){
+  st.t += dt;
+  st.v = Math.min(600, 300 + st.t*5.5);
+  st.wx += st.v*dt;
+  if (st.inv > 0) st.inv -= dt;
+
+  const prevBottom = st.y + PH;
+  st.vy += G*dt; st.y += st.vy*dt;
+  const L = st.wx + PX + 6, R = st.wx + PX + PW - 6, bottom = st.y + PH;
+  st.grounded = false;
+  for (const p of st.plats){
+    if (R < p.x || L > p.x + p.w) continue;
+    if (st.vy >= 0 && prevBottom <= p.y + 2 && bottom >= p.y){
+      st.y = p.y - PH; st.vy = 0;
+      if (st.jumps) puff(PX+PW/2, p.y, 4);
+      st.grounded = true; st.jumps = 0;
+    } else if (bottom > p.y + 10 && st.y < p.y + 200 && R - p.x < 14 && st.inv <= 0){
+      hurt(); return;          // ran into the side of a higher platform
+    }
+    // cacti
+    for (const o of p.obs){
+      const ox = p.x + o.x;
+      if (R > ox + 3 && L < ox + o.w - 3 && st.y + PH > p.y - o.h + 4) { hurt(); return; }
+    }
+    // fish
+    for (const f of p.fish){
+      if (f.got) continue;
+      const fx = p.x + f.x, fy = p.y + f.y;
+      if (fx > L-16 && fx < R+16 && fy > st.y-12 && fy < st.y+PH+12){
+        f.got = true; st.bonus += 25; puff(PX+PW/2, st.y, 8, 'rgba(125,255,158,.9)');
+      }
+    }
+  }
+  if (st.y > H + 80){ hurt(); return; }
+
+  // recycle platforms
+  while (st.plats.length && st.plats[0].x + st.plats[0].w < st.wx - 300) st.plats.shift();
+  while (lastEnd() < st.wx + VW + 800) genPlat();
+
+  // particles
+  st.parts = st.parts.filter(q => (q.life -= dt) > 0);
+  for (const q of st.parts){ q.vy += 600*dt; q.x += q.vx*dt; q.y += q.vy*dt; }
+
+  st.ft += dt; if (st.ft > 0.1){ st.ft = 0; st.frame ^= 1; }
+
+  const sc = score();
+  $('score').textContent = pad(sc);
+  if (sc >= st.nextQuiz){ st.nextQuiz += 400; openQuiz('bonus'); }
+}
+
+/* ---------- Draw ---------- */
+const DINO = [
+  "......XXXXX",
+  ".....XXOXXX",
+  ".....XXXXXX",
+  ".....XXXX..",
+  "X...XXXXXX.",
+  "XX.XXXXX...",
+  "XXXXXXXXX..",
+  ".XXXXXXX...",
+  "..XXXXX....",
+];
+const LEGS = [["..X...X....","..XX..XX..."],["...X.X.....","...XX.XX..."]];
+function drawDino(x,y){
+  const px = 4;
+  ctx.save(); ctx.shadowColor = 'rgba(125,255,158,.9)'; ctx.shadowBlur = 14;
+  const rows = DINO.concat(st.grounded ? LEGS[st.frame] : LEGS[0]);
+  for (let r=0;r<rows.length;r++) for (let c=0;c<rows[r].length;c++){
+    const ch = rows[r][c]; if (ch === '.') continue;
+    ctx.fillStyle = ch === 'O' ? '#02110a' : '#7dff9e';
+    ctx.fillRect(x + c*px, y + r*px, px, px);
+  }
+  ctx.fillStyle = 'rgba(0,0,0,.35)';
+  for (let r=0;r<rows.length;r++) for (let c=0;c<rows[r].length;c++)
+    if (rows[r][c] === 'X' && (r+1>=rows.length || rows[r+1][c] !== 'X')) ctx.fillRect(x+c*px, y+r*px+px-1, px, 1);
+  ctx.restore();
+  // thruster trail
+  if (!st.grounded){ ctx.fillStyle='rgba(62,242,255,.55)'; ctx.fillRect(x-14, y+30, 12, 3); ctx.fillStyle='rgba(62,242,255,.25)'; ctx.fillRect(x-30, y+31, 16, 1); }
+}
+function drawBg(){
+  const W = cv.width, Hh = cv.height;
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.fillStyle = '#05080f'; ctx.fillRect(0,0,W,Hh);
+  if (bg && bg.complete && bg.naturalWidth){
+    const k = Math.max(W/bg.naturalWidth, Hh/bg.naturalHeight);
+    const iw = bg.naturalWidth*k, ih = bg.naturalHeight*k;
+    ctx.drawImage(bg, (W-iw)/2, (Hh-ih)/2, iw, ih);
+  }
+  const gr = ctx.createLinearGradient(0, Hh*0.45, 0, Hh);
+  gr.addColorStop(0,'rgba(5,8,15,0)'); gr.addColorStop(1,'rgba(5,10,24,.75)');
+  ctx.fillStyle = gr; ctx.fillRect(0,0,W,Hh);
+}
+function drawFish(x,y){
+  ctx.save(); ctx.shadowColor = '#ffd36b'; ctx.shadowBlur = 12;
+  ctx.fillStyle = '#ffd36b';
+  ctx.beginPath(); ctx.ellipse(x,y,11,6,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(x+9,y); ctx.lineTo(x+17,y-6); ctx.lineTo(x+17,y+6); ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = '#05080f'; ctx.fillRect(x-6,y-2,2,2);
+}
+function draw(){
+  drawBg();
+  if (!st) return;
+  ctx.setTransform(S*dpr,0,0,S*dpr,0,OY*dpr);
+  const cam = st.wx;
+  for (const p of st.plats){
+    const x = p.x - cam; if (x > VW || x + p.w < 0) continue;
+    const body = ctx.createLinearGradient(0, p.y, 0, p.y + 180);
+    body.addColorStop(0,'rgba(10,22,40,.92)'); body.addColorStop(1,'rgba(5,8,15,.4)');
+    ctx.fillStyle = body; ctx.fillRect(x, p.y, p.w, H + 200 - p.y);
+    // holo grid
+    ctx.fillStyle = 'rgba(62,242,255,.10)';
+    const off = (p.x % 32 + 32) % 32;
+    for (let i = 32 - off; i < p.w; i += 32) ctx.fillRect(x + i, p.y + 6, 1, 120);
+    for (let j = 22; j < 130; j += 22) ctx.fillRect(x, p.y + j, p.w, 1);
+    // neon edge
+    ctx.save(); ctx.shadowColor = '#3ef2ff'; ctx.shadowBlur = 16;
+    ctx.fillStyle = '#3ef2ff'; ctx.fillRect(x, p.y, p.w, 3);
+    ctx.fillRect(x, p.y, 2, 40); ctx.fillRect(x + p.w - 2, p.y, 2, 40);
+    ctx.restore();
+    // light chasers on the edge
+    const cx = x + ((st.t*160 + p.x) % p.w);
+    ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.fillRect(cx, p.y, 14, 2);
+    for (const o of p.obs){
+      const ox = x + o.x, oy = p.y - o.h;
+      ctx.save(); ctx.shadowColor = '#ff3ea5'; ctx.shadowBlur = 18;
+      ctx.fillStyle = '#ff3ea5';
+      ctx.beginPath(); ctx.moveTo(ox, p.y); ctx.lineTo(ox + o.w/2, oy); ctx.lineTo(ox + o.w, p.y); ctx.closePath(); ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = 'rgba(255,255,255,.75)';
+      ctx.fillRect(ox + o.w/2 - 1, oy + 8, 2, o.h - 12);
+      const pulse = 0.5 + 0.5*Math.sin(st.t*10 + o.x);
+      ctx.fillStyle = `rgba(255,62,165,${0.25 + 0.35*pulse})`;
+      ctx.fillRect(ox - 4, p.y - 2, o.w + 8, 2);
+    }
+    for (const f of p.fish) if (!f.got) drawFish(x + f.x, p.y + f.y + Math.sin(st.t*4 + f.x)*3);
+  }
+  for (const q of st.parts){ ctx.fillStyle = q.col; ctx.fillRect(q.x - cam, q.y, 4, 4); }
+  if (!(st.inv > 0 && Math.floor(st.t*12)%2)) drawDino(PX - 2, st.y);
+}
+
+/* ---------- Loop ---------- */
+let last = performance.now();
+function loop(now){
+  const dt = Math.min(0.033, (now - last)/1000); last = now;
+  if (mode === 'play') update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* ---------- Screens ---------- */
+function show(id){ ['menu','quiz','over'].forEach(k => $(k).hidden = k !== id); }
+function renderHearts(){ const h=$('hearts'); h.innerHTML=''; for(let i=0;i<3;i++){ const c=document.createElement('span'); c.className='cell'+(st&&i<st.lives?' on':''); h.appendChild(c);} }
+function start(){ resize(); newGame(); renderHearts(); mode = 'play'; show(null); $('pauseBtn').textContent = 'Pause'; }
+function gameOver(){
+  mode = 'over';
+  const sc = Math.floor(score());
+  const rec = sc > best;
+  if (rec){ best = sc; store.set('dinochat_best', String(best)); $('hi').textContent = 'RECORD ' + pad(best); }
+  $('oEyebrow').textContent = 'Partie terminée';
+  $('oScore').textContent = sc;
+  $('oText').textContent = rec ? 'Nouveau record !' : 'Record à battre : ' + best;
+  show('over');
+}
+function togglePause(){
+  if (mode === 'play'){ mode = 'paused'; $('pauseBtn').textContent = 'Reprendre'; }
+  else if (mode === 'paused'){ mode = 'play'; $('pauseBtn').textContent = 'Pause'; last = performance.now(); }
+}
+$('pauseBtn').onclick = togglePause;
+$('playBtn').onclick = start;
+$('againBtn').onclick = start;
+$('menuBtn').onclick = () => { mode = 'menu'; show('menu'); };
+
+/* ---------- Mini-jeu : questions sur le chat ---------- */
+const QUESTIONS = [
+  { q:'De quelle couleur est le chat ?', a:'Gris et noir',
+    opts:[['Gris et noir','linear-gradient(90deg,#8a8d93 50%,#1b1c1f 50%)'],['Roux et blanc','linear-gradient(90deg,#d9822b 50%,#f3f3f3 50%)'],['Tout blanc','#f3f3f3'],['Tigré orange','#e08a2e']] },
+  { q:'De quelle couleur sont ses yeux ?', a:'Vert',
+    opts:[['Vert','#3fd46f'],['Bleu','#4a8cff'],['Jaune','#ffd23f'],['Marron','#7a4a22']] },
+  { q:'Combien de couleurs a son pelage ?', a:'2',
+    opts:[['1',''],['2',''],['3',''],['4','']] },
+];
+let qMode = 'bonus', qIdx = 0, qGood = 0, qOrder = [];
+function shuffle(a){ a = a.slice(); for (let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]] = [a[j],a[i]]; } return a; }
+function openQuiz(kind){
+  qMode = kind;
+  if (kind === 'bonus'){ mode = 'quiz'; qOrder = [Math.floor(Math.random()*QUESTIONS.length)]; }
+  else { mode = 'quizsolo'; qOrder = shuffle([0,1,2]); }
+  qIdx = 0; qGood = 0;
+  if (bg) $('qImg').src = bg.src;
+  askQuestion();
+  show('quiz');
+}
+function askQuestion(){
+  const Q = QUESTIONS[qOrder[qIdx]];
+  $('qEyebrow').textContent = qMode === 'bonus' ? 'Question bonus · +100 et une vie' : 'Mini-jeu · question ' + (qIdx+1) + ' / ' + qOrder.length;
+  $('qText').textContent = Q.q;
+  $('qFeed').textContent = ''; $('qFeed').className = 'feedback';
+  $('qNext').hidden = true;
+  const box = $('qOpts'); box.innerHTML = '';
+  shuffle(Q.opts).forEach(([label, sw]) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'opt';
+    if (sw){ const s = document.createElement('span'); s.className = 'sw'; s.style.background = sw; b.appendChild(s); }
+    b.appendChild(document.createTextNode(label));
+    b.onclick = () => answer(b, label, Q);
+    box.appendChild(b);
+  });
+  box.querySelector('button').focus();
+}
+function answer(btn, label, Q){
+  const buttons = [...$('qOpts').children];
+  buttons.forEach(b => { b.disabled = true; if (b.textContent === Q.a) b.classList.add('ok'); });
+  const ok = label === Q.a;
+  if (!ok) btn.classList.add('no');
+  const fb = $('qFeed');
+  if (ok){
+    qGood++;
+    fb.className = 'feedback ok';
+    if (qMode === 'bonus'){
+      st.bonus += 100;
+      if (st.lives < 3){ st.lives++; renderHearts(); fb.textContent = 'Bravo ! +100 points et une vie'; }
+      else fb.textContent = 'Bravo ! +100 points';
+    } else fb.textContent = 'Bravo !';
+  } else {
+    fb.className = 'feedback no';
+    fb.textContent = 'Raté, la bonne réponse : ' + Q.a.toLowerCase();
+  }
+  const btnNext = $('qNext');
+  btnNext.textContent = qMode === 'bonus' ? 'Continuer la course' : (qIdx < qOrder.length-1 ? 'Question suivante' : 'Voir le résultat');
+  btnNext.hidden = false; btnNext.focus();
+}
+$('qNext').onclick = () => {
+  if (qMode === 'bonus'){
+    show(null); mode = 'play'; last = performance.now();
+    st.inv = Math.max(st.inv, 0.8);
+    return;
+  }
+  if (qIdx < qOrder.length-1){ qIdx++; askQuestion(); return; }
+  mode = 'over';
+  $('oEyebrow').textContent = 'Mini-jeu du chat';
+  $('oScore').textContent = qGood + ' / ' + qOrder.length;
+  $('oText').textContent = qGood === qOrder.length ? 'Parfait, tu connais bien ce chat.' : 'Regarde bien la photo et réessaie.';
+  $('againBtn').textContent = 'Jouer à la course';
+  show('over');
+};
+$('quizBtn').onclick = () => openQuiz('solo');
+$('againBtn').addEventListener('click', () => { $('againBtn').textContent = 'Rejouer'; });
+
+// idle preview behind the menu
+newGame(); renderHearts();
+})();
+</script>
